@@ -84,15 +84,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          if (_isLoggedIn)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _logout,
-            ),
-        ],
-      ),
+      // appBar: AppBar(
+      //   actions: [
+      //     if (_isLoggedIn)
+      //       IconButton(
+      //         icon: const Icon(Icons.logout),
+      //         onPressed: _logout,
+      //       ),
+      //   ],
+      // ),
       body: Stack(
         children: [
           Positioned(
