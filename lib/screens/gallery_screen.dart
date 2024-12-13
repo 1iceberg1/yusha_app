@@ -53,7 +53,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             children: [
               // Top gray container with curved bottom
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: Stack(
                   children: [
                     Container(
