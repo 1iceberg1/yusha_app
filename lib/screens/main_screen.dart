@@ -98,51 +98,54 @@ class _MainScreenState extends State<MainScreen> {
           Positioned(
             top: 30,
             right: 20,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                HoverButton(
-                    defaultColor: Colors.orange,
-                    hoverColor: Colors.grey,
-                    icon: Icons.edit,
-                    onPressed: () {
-                      if (_isLoggedIn) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => DrawingScreen()),
-                        );
-                      }
-                    }),
-                const SizedBox(width: 10),
-                HoverButton(
-                    defaultColor: Colors.orange,
-                    hoverColor: Colors.grey,
-                    icon: Icons.image,
-                    onPressed: () {
-                      if (_isLoggedIn) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => GalleryScreen()),
-                        );
-                      }
-                    }),
-                const SizedBox(width: 10),
-                HoverButton(
-                    defaultColor: Colors.orange,
-                    hoverColor: Colors.grey,
-                    icon: Icons.camera_alt,
-                    onPressed: () {
-                      if (_isLoggedIn) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => CameraScreen()),
-                        );
-                      }
-                    }),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HoverButton(
+                      defaultColor: Colors.orange,
+                      hoverColor: Colors.grey,
+                      icon: Icons.edit,
+                      onPressed: () {
+                        if (_isLoggedIn) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => DrawingScreen()),
+                          );
+                        }
+                      }),
+                  const SizedBox(width: 10),
+                  HoverButton(
+                      defaultColor: Colors.orange,
+                      hoverColor: Colors.grey,
+                      icon: Icons.image,
+                      onPressed: () {
+                        if (_isLoggedIn) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => GalleryScreen()),
+                          );
+                        }
+                      }),
+                  const SizedBox(width: 10),
+                  HoverButton(
+                      defaultColor: Colors.orange,
+                      hoverColor: Colors.grey,
+                      icon: Icons.camera_alt,
+                      onPressed: () {
+                        if (_isLoggedIn) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => CameraScreen()),
+                          );
+                        }
+                      }),
+                ],
+              ),
             ),
           ),
           if (!_isLoggedIn)

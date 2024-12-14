@@ -154,7 +154,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
             if (_sliderActivated)
               Positioned.fill(
                 child: Container(
-                  color: Colors.black.withOpacity(0.5), // Dim the background
+                  color: Colors.black.withOpacity(0), // Dim the background
                   child: Center(
                     child: Container(
                       width: _selectedTool == Tool.Pen
@@ -309,7 +309,7 @@ class _DrawingScreenState extends State<DrawingScreen> {
               setState(() {
                 _selectedColor = color;
               });
-              Navigator.pop(context);
+              // Navigator.pop(context);
             },
           ),
         );
