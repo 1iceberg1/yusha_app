@@ -185,7 +185,9 @@ class _DrawingScreenState extends State<DrawingScreen> {
       duration: const Duration(milliseconds: 300), // Animation duration
       curve: Curves.easeInOut, // Animation curve
       left: _sliderActivated ? 16 : -16, // Conditional left padding
-      top: MediaQuery.of(context).size.height / 2 - 150 - 100, // Conditional top alignment
+      top: MediaQuery.of(context).size.height / 2 -
+          150 -
+          100, // Conditional top alignment
       child: GestureDetector(
         onTap: () => setState(() {
           if (_selectedTool != Tool.Bucket) _sliderActivated = true;
@@ -646,6 +648,35 @@ class CustomRoundedRectThumb extends SliderComponentShape {
   }
 
   @override
+  // void paint(
+  //   PaintingContext context,
+  //   Offset center, {
+  //   required Animation<double> activationAnimation,
+  //   required Animation<double> enableAnimation,
+  //   required bool isDiscrete,
+  //   required TextPainter labelPainter,
+  //   required RenderBox parentBox,
+  //   required SliderThemeData sliderTheme,
+  //   required TextDirection textDirection,
+  //   required double value,
+  //   required double textScaleFactor,
+  //   required Size sizeWithOverflow,
+  // }) {
+  //   final paint = Paint()
+  //     ..color = Colors.white
+  //     ..style = PaintingStyle.fill;
+
+  //   final rect = RRect.fromRectAndRadius(
+  //     Rect.fromCenter(
+  //       center: center,
+  //       width: thumbWidth,
+  //       height: thumbHeight,
+  //     ),
+  //     Radius.circular(thumbRadius),
+  //   );
+
+  //   context.canvas.drawRRect(rect, paint);
+  // }
   void paint(
     PaintingContext context,
     Offset center, {
@@ -660,11 +691,29 @@ class CustomRoundedRectThumb extends SliderComponentShape {
     required double textScaleFactor,
     required Size sizeWithOverflow,
   }) {
-    final paint = Paint()
+    // Paint for the border
+    final borderPaint = Paint()
+      ..color = Colors.grey
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0; // Border thickness
+
+    // Paint for the fill
+    final fillPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
 
-    final rect = RRect.fromRectAndRadius(
+    // Define the border rectangle (slightly larger for the border effect)
+    final borderRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: center,
+        width: thumbWidth + 1, // Slightly larger width for the border
+        height: thumbHeight + 1, // Slightly larger height for the border
+      ),
+      Radius.circular(thumbRadius + 1), // Slightly larger radius
+    );
+
+    // Define the fill rectangle (actual thumb size)
+    final fillRect = RRect.fromRectAndRadius(
       Rect.fromCenter(
         center: center,
         width: thumbWidth,
@@ -673,6 +722,10 @@ class CustomRoundedRectThumb extends SliderComponentShape {
       Radius.circular(thumbRadius),
     );
 
-    context.canvas.drawRRect(rect, paint);
+    // Draw the border first
+    context.canvas.drawRRect(borderRect, borderPaint);
+
+    // Draw the fill on top
+    context.canvas.drawRRect(fillRect, fillPaint);
   }
 }
