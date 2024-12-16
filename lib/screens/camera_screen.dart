@@ -11,13 +11,18 @@ class CameraScreen extends StatefulWidget {
   _CameraScreenState createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver {
+class _CameraScreenState extends State<CameraScreen>
+    with WidgetsBindingObserver {
   final ImagePicker _picker = ImagePicker();
   File? selectedGif;
   bool showGifOverlay = false;
   bool isArMode = false;
   CameraController? _cameraController;
   List<CameraDescription>? cameras;
+
+  Offset gifPosition = const Offset(100, 200); // Initial position of the GIF
+  double gifSize = 150.0; // Initial size of the GIF
+  double zoomLevel = 1.0; // Camera zoom level
 
   @override
   void initState() {
@@ -154,16 +159,87 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
             _cameraController != null && _cameraController!.value.isInitialized
                 ? Stack(
                     children: [
+                      // Camera Preview
                       CameraPreview(_cameraController!),
+
+                      // Controls for camera functionalities (zoom and flash)
+                      Positioned(
+                        top: 20,
+                        right: 20,
+                        child: Column(
+                          children: [
+                            // Zoom In Button
+                            IconButton(
+                              icon: const Icon(Icons.zoom_in,
+                                  color: Colors.white, size: 28),
+                              onPressed: () {
+                                setState(() {
+                                  zoomLevel = (zoomLevel + 0.5).clamp(1.0, 8.0);
+                                  _cameraController!.setZoomLevel(zoomLevel);
+                                });
+                              },
+                            ),
+                            // Zoom Out Button
+                            IconButton(
+                              icon: const Icon(Icons.zoom_out,
+                                  color: Colors.white, size: 28),
+                              onPressed: () {
+                                setState(() {
+                                  zoomLevel = (zoomLevel - 0.5).clamp(1.0, 8.0);
+                                  _cameraController!.setZoomLevel(zoomLevel);
+                                });
+                              },
+                            ),
+                            // Flash Toggle
+                            IconButton(
+                              icon: Icon(
+                                _cameraController!.value.flashMode ==
+                                        FlashMode.torch
+                                    ? Icons.flash_on
+                                    : Icons.flash_off,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _cameraController!.setFlashMode(
+                                    _cameraController!.value.flashMode ==
+                                            FlashMode.torch
+                                        ? FlashMode.off
+                                        : FlashMode.torch,
+                                  );
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // GIF Overlay: Allows Dragging and Resizing
                       if (selectedGif != null)
                         Positioned(
-                          left: MediaQuery.of(context).size.width * 0.25,
-                          top: MediaQuery.of(context).size.height * 0.35,
-                          child: Image.file(
-                            selectedGif!,
-                            width: 150,
-                            height: 150,
-                            fit: BoxFit.contain,
+                          left: gifPosition.dx,
+                          top: gifPosition.dy,
+                          child: GestureDetector(
+                            onScaleUpdate: (details) {
+                              setState(() {
+                                // Update position (pan) using the focal point
+                                gifPosition = Offset(
+                                  gifPosition.dx + details.focalPointDelta.dx,
+                                  gifPosition.dy + details.focalPointDelta.dy,
+                                );
+
+                                // Update size (scale) using the scale factor
+                                gifSize = (gifSize * details.scale)
+                                    .clamp(50.0, 300.0);
+                              });
+                            },
+                            child: Image.file(
+                              selectedGif!,
+                              width: gifSize,
+                              height: gifSize,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                     ],
