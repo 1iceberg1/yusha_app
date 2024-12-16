@@ -118,12 +118,22 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _openGallery() async {
-    final XFile? file =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (file != null) {
-      setState(() {
-        galleryImage = File(file.path);
-      });
+    try {
+      final XFile? file =
+          await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file != null) {
+        setState(() {
+          galleryImage = File(file.path); // Update the gallery image
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Image selected: ${file.path}")),
+        );
+      }
+    } catch (e) {
+      print("Error opening gallery: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error opening gallery.")),
+      );
     }
   }
 
