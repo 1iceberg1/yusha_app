@@ -526,14 +526,36 @@ class _CameraScreenState extends State<CameraScreen>
           automaticallyImplyLeading: false,
           backgroundColor: Colors.grey[800],
           elevation: 0,
-          leading: showGifOverlay
+          leading: (showGifOverlay && !isArMode)
               ? Padding(
                   padding: const EdgeInsets.only(left: 16.0),
-                  child: HoverButton(
-                    icon: Icons.vrpano,
-                    defaultColor: Colors.white,
-                    strokeColor: Colors.grey,
-                    onPressed: startArMode,
+                  child: InkWell(
+                    onTap: startArMode,
+                    borderRadius: BorderRadius.circular(
+                        50), // Ensure a circular ripple effect
+                    child: Container(
+                      width: 48, // Adjust the size of the circular button
+                      height: 48, // Adjust the size of the circular button
+                      decoration: BoxDecoration(
+                        color: Colors.white, // Circle background color
+                        shape: BoxShape.circle, // Makes the background circular
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12, // Adds a subtle shadow
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(
+                            8.0), // Adds some spacing around the image
+                        child: Image.asset(
+                          'assets/images/AR_icon.png', // Path to your custom PNG icon
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
                   ),
                 )
               : null,
