@@ -1,8 +1,19 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+// import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:camera/camera.dart';
 import 'package:yusha_test/widgets/hover_button.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+
+final GlobalKey _cameraKey = GlobalKey(); // Key to capture screenshot boundary
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({Key? key}) : super(key: key);
@@ -49,25 +60,61 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
-  void _setUpCamera() async {
-    if (_cameraController != null) await _cameraController?.dispose();
+  Future<void> _setUpCamera() async {
+    try {
+      // Dispose of the existing CameraController
+      if (_cameraController != null) {
+        await _cameraController?.dispose();
+      }
 
-    _cameraController = CameraController(
-      cameras![_isRearCameraSelected ? 0 : 1],
-      selectedResolution,
-      enableAudio: false,
-    );
+      // Initialize the CameraController
+      _cameraController = CameraController(
+        cameras![_isRearCameraSelected ? 0 : 1],
+        selectedResolution,
+        enableAudio: false,
+      );
 
-    await _cameraController!.initialize();
-    maxZoomLevel = await _cameraController!.getMaxZoomLevel();
-    setState(() {});
+      await _cameraController!.initialize();
+
+      // Update the maximum zoom level
+      maxZoomLevel = await _cameraController!.getMaxZoomLevel();
+
+      setState(() {}); // Update the UI
+    } catch (e) {
+      print("Error setting up camera: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to initialize camera: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
-  void _switchCamera() {
-    setState(() {
-      _isRearCameraSelected = !_isRearCameraSelected;
-    });
-    _setUpCamera();
+  void _switchCamera() async {
+    try {
+      // Toggle the camera index (front/rear)
+      setState(() {
+        _isRearCameraSelected = !_isRearCameraSelected;
+      });
+
+      // Reinitialize the camera
+      await _setUpCamera();
+    } catch (e) {
+      print("Error switching camera: $e");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to switch camera: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      // Revert the toggle if an error occurs
+      setState(() {
+        _isRearCameraSelected = !_isRearCameraSelected;
+      });
+    }
   }
 
   void _toggleFlash() {
@@ -78,21 +125,234 @@ class _CameraScreenState extends State<CameraScreen>
     _cameraController?.setFlashMode(_flashMode);
   }
 
-  void _changeResolution(ResolutionPreset newResolution) {
-    setState(() {
-      selectedResolution = newResolution;
-    });
-    _setUpCamera();
+  void _changeResolution(ResolutionPreset newResolution) async {
+    try {
+      // Attempt to change resolution
+      setState(() {
+        selectedResolution = newResolution;
+      });
+
+      await _setUpCamera(); // Reinitialize camera with the new resolution
+    } on CameraException catch (e) {
+      print("CameraException while changing resolution: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text("Error changing resolution: ${e.description ?? e.code}"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      // Revert to the previous resolution in case of an error
+      setState(() {
+        selectedResolution = ResolutionPreset.high;
+      });
+      await _setUpCamera(); // Attempt recovery with default resolution
+    } catch (e) {
+      print("Unexpected error during resolution change: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("An unexpected error occurred: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      // Revert to the default resolution
+      setState(() {
+        selectedResolution = ResolutionPreset.high;
+      });
+      await _setUpCamera();
+    }
   }
 
+  // void _takePicture() async {
+  //   try {
+  //     // Check if the camera controller is initialized and not disposed
+  //     if (_cameraController == null ||
+  //         !_cameraController!.value.isInitialized) {
+  //       print("Camera is not available or already disposed.");
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Camera is not ready. Please restart.")),
+  //       );
+  //       return;
+  //     }
+
+  //     // Request storage permissions if needed
+  //     if (await Permission.storage.request().isGranted) {
+  //       // Take a picture and get the file path
+  //       final XFile file = await _cameraController!.takePicture();
+
+  //       // Get the external directory for saving the image
+  //       final Directory? externalDir = await getExternalStorageDirectory();
+  //       if (externalDir == null) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text("Could not access external storage.")),
+  //         );
+  //         return;
+  //       }
+
+  //       // Create a new file path
+  //       final String filePath =
+  //           "${externalDir.path}/photo_${DateTime.now().millisecondsSinceEpoch}.jpg";
+
+  //       // Move the image to the external directory
+  //       final File newImage = await File(file.path).copy(filePath);
+
+  //       // Update the state and notify the user
+  //       if (mounted) {
+  //         setState(() {
+  //           galleryImage = newImage;
+  //         });
+  //       }
+
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text("Photo saved to: $filePath")),
+  //       );
+  //     } else {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Storage permission denied.")),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     print("Error saving image: $e");
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text("Error saving the image: $e")),
+  //     );
+  //   }
+  // }
+
+  // // Take Picture with GIF
+  // void _takePicture() async {
+  //   try {
+  //     // Check if the CameraController is ready
+  //     if (_cameraController == null ||
+  //         !_cameraController!.value.isInitialized) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Camera is not ready.")),
+  //       );
+  //       return;
+  //     }
+
+  //     // Request storage permissions
+  //     if (!await Permission.storage.request().isGranted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Storage permission denied.")),
+  //       );
+  //       return;
+  //     }
+
+  //     // Take a picture using the camera
+  //     final XFile pictureFile = await _cameraController!.takePicture();
+
+  //     // Load the captured image using the image package
+  //     img.Image capturedImage =
+  //         img.decodeImage(File(pictureFile.path).readAsBytesSync())!;
+
+  //     // Check if a GIF file is selected
+  //     if (selectedGif != null && File(selectedGif!.path).existsSync()) {
+  //       // Load the GIF file as an image
+  //       img.Image gifImage =
+  //           img.decodeImage(File(selectedGif!.path).readAsBytesSync())!;
+
+  //       // Resize the GIF to fit the overlay size
+  //       gifImage = img.copyResize(gifImage,
+  //           width: gifSize.toInt(), height: gifSize.toInt());
+
+  //       // Overlay the GIF image on the captured image at the specified position
+  //       img.compositeImage(
+  //         capturedImage,
+  //         gifImage,
+  //         dstX: gifPosition.dx.toInt(), // X position of the GIF
+  //         dstY: gifPosition.dy.toInt(), // Y position of the GIF
+  //       );
+  //     }
+
+  //     // Get external storage directory to save the new image
+  //     final Directory? externalDir = await getExternalStorageDirectory();
+  //     if (externalDir == null) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text("Could not access external storage.")),
+  //       );
+  //       return;
+  //     }
+
+  //     // Save the final composited image
+  //     final String filePath =
+  //         "${externalDir.path}/photo_with_gif_${DateTime.now().millisecondsSinceEpoch}.jpg";
+  //     final File newImageFile = File(filePath)
+  //       ..writeAsBytesSync(img.encodeJpg(capturedImage));
+
+  //     // Update the state with the new image
+  //     setState(() {
+  //       galleryImage = newImageFile;
+  //     });
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text("Photo with GIF saved to: $filePath")),
+  //     );
+  //   } catch (e) {
+  //     print("Error taking picture with GIF overlay: $e");
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text("Error saving the photo with overlay.")),
+  //     );
+  //   }
+  // }
+
   void _takePicture() async {
-    final XFile file = await _cameraController!.takePicture();
-    setState(() {
-      galleryImage = File(file.path);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Photo saved: ${file.path}")),
-    );
+    try {
+      // Check for permission to save the file
+      if (!await Permission.storage.request().isGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Storage permission denied.")),
+        );
+        return;
+      }
+
+      // Find the RenderObject for the boundary key
+      RenderRepaintBoundary boundary = _cameraKey.currentContext
+          ?.findRenderObject() as RenderRepaintBoundary;
+
+      // Convert the boundary into an image
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+
+      // Convert the image to bytes
+      final ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        throw Exception("Failed to capture image.");
+      }
+
+      final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      // Save the screenshot to external storage
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not access external storage.")),
+        );
+        return;
+      }
+
+      final String filePath =
+          "${externalDir.path}/screenshot_${DateTime.now().millisecondsSinceEpoch}.png";
+
+      final File imageFile = File(filePath);
+      await imageFile.writeAsBytes(pngBytes);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Screenshot saved to: $filePath")),
+      );
+
+      setState(() {
+        galleryImage = imageFile;
+      });
+    } catch (e) {
+      print("Error taking screenshot: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error taking screenshot.")),
+      );
+    }
   }
 
   void _startVideoRecording() async {
@@ -105,29 +365,82 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   void _stopVideoRecording() async {
-    if (!isRecording) return;
+    try {
+      // Check if the CameraController is valid and initialized
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
+        print("Camera is not available or already disposed.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Camera is not ready. Please restart.")),
+        );
+        return;
+      }
 
-    final XFile file = await _cameraController!.stopVideoRecording();
-    setState(() {
-      galleryImage = File(file.path);
-      isRecording = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Video saved: ${file.path}")),
-    );
+      // Check if recording is ongoing
+      if (!isRecording) return;
+
+      // Stop recording the video
+      final XFile file = await _cameraController!.stopVideoRecording();
+
+      // Check for storage permission
+      if (await Permission.storage.request().isGranted) {
+        // Get the external storage directory
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Could not access external storage.")),
+          );
+          return;
+        }
+
+        // Create a new file path with a unique name
+        final String newPath =
+            "${externalDir.path}/video_${DateTime.now().millisecondsSinceEpoch}.mp4";
+
+        // Move the video to the external directory
+        final File newVideo = await File(file.path).copy(newPath);
+
+        // Update the state only if the widget is still mounted
+        if (mounted) {
+          setState(() {
+            galleryImage = newVideo; // Update with the new file path
+            isRecording = false;
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Video saved to: $newPath")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Storage permission denied.")),
+        );
+      }
+    } catch (e) {
+      print("Error stopping video recording: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving the video: $e")),
+      );
+    }
   }
 
   Future<void> _openGallery() async {
     try {
-      final XFile? file =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
-      if (file != null) {
-        setState(() {
-          galleryImage = File(file.path); // Update the gallery image
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Image selected: ${file.path}")),
+      if (Platform.isIOS) {
+        final Uri url = Uri.parse("photos-redirect://");
+
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url);
+        } else {
+          throw 'Could not open Photos app';
+        }
+      } else if (Platform.isAndroid) {
+        const intent = AndroidIntent(
+          action: 'action_view',
+          type: 'image/*',
+          flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
         );
+        intent.launch();
       }
     } catch (e) {
       print("Error opening gallery: $e");
@@ -261,61 +574,45 @@ class _CameraScreenState extends State<CameraScreen>
             _cameraController != null && _cameraController!.value.isInitialized
                 ? Stack(
                     children: [
-                      // Camera Preview
-                      CameraPreview(_cameraController!),
+                      RepaintBoundary(
+                        key: _cameraKey, // Global key for screenshot
+                        child: Stack(
+                          children: [
+                            // Camera Preview
+                            CameraPreview(_cameraController!),
 
-                      // // Controls for camera functionalities (zoom and flash)
-                      // Positioned(
-                      //   top: 20,
-                      //   right: 20,
-                      //   child: Column(
-                      //     children: [
-                      //       // Zoom In Button
-                      //       IconButton(
-                      //         icon: const Icon(Icons.zoom_in,
-                      //             color: Colors.white, size: 28),
-                      //         onPressed: () {
-                      //           setState(() {
-                      //             zoomLevel = (zoomLevel + 0.5).clamp(1.0, maxZoomLevel);
-                      //             _cameraController!.setZoomLevel(zoomLevel);
-                      //           });
-                      //         },
-                      //       ),
-                      //       // Zoom Out Button
-                      //       IconButton(
-                      //         icon: const Icon(Icons.zoom_out,
-                      //             color: Colors.white, size: 28),
-                      //         onPressed: () {
-                      //           setState(() {
-                      //             zoomLevel = (zoomLevel - 0.5).clamp(1.0, 8.0);
-                      //             _cameraController!.setZoomLevel(zoomLevel);
-                      //           });
-                      //         },
-                      //       ),
-                      //       // // Flash Toggle
-                      //       // IconButton(
-                      //       //   icon: Icon(
-                      //       //     _cameraController!.value.flashMode ==
-                      //       //             FlashMode.torch
-                      //       //         ? Icons.flash_on
-                      //       //         : Icons.flash_off,
-                      //       //     color: Colors.white,
-                      //       //     size: 28,
-                      //       //   ),
-                      //       //   onPressed: () {
-                      //       //     setState(() {
-                      //       //       _cameraController!.setFlashMode(
-                      //       //         _cameraController!.value.flashMode ==
-                      //       //                 FlashMode.torch
-                      //       //             ? FlashMode.off
-                      //       //             : FlashMode.torch,
-                      //       //       );
-                      //       //     });
-                      //       //   },
-                      //       // ),
-                      //     ],
-                      //   ),
-                      // ),
+                            // GIF Overlay: Allows Dragging and Resizing
+                            if (selectedGif != null)
+                              Positioned(
+                                left: gifPosition.dx,
+                                top: gifPosition.dy,
+                                child: GestureDetector(
+                                  onScaleUpdate: (details) {
+                                    setState(() {
+                                      // Update position (pan) using the focal point
+                                      gifPosition = Offset(
+                                        gifPosition.dx +
+                                            details.focalPointDelta.dx,
+                                        gifPosition.dy +
+                                            details.focalPointDelta.dy,
+                                      );
+
+                                      // Update size (scale) using the scale factor
+                                      gifSize = (gifSize * details.scale)
+                                          .clamp(50.0, 300.0);
+                                    });
+                                  },
+                                  child: Image.file(
+                                    selectedGif!,
+                                    width: gifSize,
+                                    height: gifSize,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
 
                       // Zoom Slider
                       Positioned(
@@ -338,55 +635,55 @@ class _CameraScreenState extends State<CameraScreen>
                         ),
                       ),
 
-                      // Camera Controls
-                      Positioned(
-                        top: 40,
-                        right: 20,
-                        child: Column(
-                          children: [
-                            // // Flash Control
-                            // IconButton(
-                            //   icon: Icon(
-                            //     _flashMode == FlashMode.torch
-                            //         ? Icons.flash_on
-                            //         : Icons.flash_off,
-                            //     color: Colors.white,
-                            //   ),
-                            //   onPressed: _toggleFlash,
-                            // ),
-                            // // Camera Switch
-                            // IconButton(
-                            //   icon: const Icon(Icons.cameraswitch,
-                            //       color: Colors.white),
-                            //   onPressed: _switchCamera,
-                            // ),
-                            // Resolution Selector
-                            DropdownButton<ResolutionPreset>(
-                              dropdownColor: Colors.black,
-                              value: selectedResolution,
-                              items: resolutions
-                                  .map((res) => DropdownMenuItem(
-                                        value: res,
-                                        child: Text(
-                                          res
-                                              .toString()
-                                              .split('.')
-                                              .last
-                                              .toUpperCase(),
-                                          style: const TextStyle(
-                                              color: Colors.white),
-                                        ),
-                                      ))
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value != null) {
-                                  _changeResolution(value);
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+                      // // Camera Controls
+                      // Positioned(
+                      //   top: 40,
+                      //   right: 20,
+                      //   child: Column(
+                      //     children: [
+                      //       // // Flash Control
+                      //       // IconButton(
+                      //       //   icon: Icon(
+                      //       //     _flashMode == FlashMode.torch
+                      //       //         ? Icons.flash_on
+                      //       //         : Icons.flash_off,
+                      //       //     color: Colors.white,
+                      //       //   ),
+                      //       //   onPressed: _toggleFlash,
+                      //       // ),
+                      //       // // Camera Switch
+                      //       // IconButton(
+                      //       //   icon: const Icon(Icons.cameraswitch,
+                      //       //       color: Colors.white),
+                      //       //   onPressed: _switchCamera,
+                      //       // ),
+                      //       // Resolution Selector
+                      //       DropdownButton<ResolutionPreset>(
+                      //         dropdownColor: Colors.black,
+                      //         value: selectedResolution,
+                      //         items: resolutions
+                      //             .map((res) => DropdownMenuItem(
+                      //                   value: res,
+                      //                   child: Text(
+                      //                     res
+                      //                         .toString()
+                      //                         .split('.')
+                      //                         .last
+                      //                         .toUpperCase(),
+                      //                     style: const TextStyle(
+                      //                         color: Colors.white),
+                      //                   ),
+                      //                 ))
+                      //             .toList(),
+                      //         onChanged: (value) {
+                      //           if (value != null) {
+                      //             _changeResolution(value);
+                      //           }
+                      //         },
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
 
                       // Bottom Controls
                       Positioned(
@@ -446,34 +743,6 @@ class _CameraScreenState extends State<CameraScreen>
                           ],
                         ),
                       ),
-
-                      // GIF Overlay: Allows Dragging and Resizing
-                      if (selectedGif != null)
-                        Positioned(
-                          left: gifPosition.dx,
-                          top: gifPosition.dy,
-                          child: GestureDetector(
-                            onScaleUpdate: (details) {
-                              setState(() {
-                                // Update position (pan) using the focal point
-                                gifPosition = Offset(
-                                  gifPosition.dx + details.focalPointDelta.dx,
-                                  gifPosition.dy + details.focalPointDelta.dy,
-                                );
-
-                                // Update size (scale) using the scale factor
-                                gifSize = (gifSize * details.scale)
-                                    .clamp(50.0, 300.0);
-                              });
-                            },
-                            child: Image.file(
-                              selectedGif!,
-                              width: gifSize,
-                              height: gifSize,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
                     ],
                   )
                 : const Center(child: CircularProgressIndicator())

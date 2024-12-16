@@ -6,8 +6,12 @@
 		<string>your usage description here</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>your usage description here</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>This app needs permission to save videos and images to your gallery.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>App needs access to photo lib for profile images</string>
+		<string>This app requires access to your photo library to save recorded media.</string>
+		<key>NSDocumentsFolderUsageDescription</key>
+		<string>This app needs access to your documents folder to store files.</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
