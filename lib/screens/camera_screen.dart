@@ -15,6 +15,7 @@ class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
   final ImagePicker _picker = ImagePicker();
   File? selectedGif;
+  File? galleryImage;
   bool showGifOverlay = false;
   bool isArMode = false;
   CameraController? _cameraController;
@@ -23,6 +24,14 @@ class _CameraScreenState extends State<CameraScreen>
   Offset gifPosition = const Offset(100, 200); // Initial position of the GIF
   double gifSize = 150.0; // Initial size of the GIF
   double zoomLevel = 1.0; // Camera zoom level
+  double maxZoomLevel = 1.0;
+  bool isRecording = false;
+  bool isImageMode = true; // Toggle between Image and Video modes
+  bool _isRearCameraSelected = true;
+  FlashMode _flashMode = FlashMode.off;
+
+  List<ResolutionPreset> resolutions = ResolutionPreset.values;
+  ResolutionPreset selectedResolution = ResolutionPreset.ultraHigh;
 
   @override
   void initState() {
@@ -34,17 +43,87 @@ class _CameraScreenState extends State<CameraScreen>
   Future<void> initializeCamera() async {
     try {
       cameras = await availableCameras();
-      if (cameras != null && cameras!.isNotEmpty) {
-        _cameraController = CameraController(
-          cameras!.first,
-          ResolutionPreset.high,
-          enableAudio: false,
-        );
-        await _cameraController!.initialize();
-        setState(() {});
-      }
+      _setUpCamera();
     } catch (e) {
       print("Error initializing camera: $e");
+    }
+  }
+
+  void _setUpCamera() async {
+    if (_cameraController != null) await _cameraController?.dispose();
+
+    _cameraController = CameraController(
+      cameras![_isRearCameraSelected ? 0 : 1],
+      selectedResolution,
+      enableAudio: false,
+    );
+
+    await _cameraController!.initialize();
+    maxZoomLevel = await _cameraController!.getMaxZoomLevel();
+    setState(() {});
+  }
+
+  void _switchCamera() {
+    setState(() {
+      _isRearCameraSelected = !_isRearCameraSelected;
+    });
+    _setUpCamera();
+  }
+
+  void _toggleFlash() {
+    setState(() {
+      _flashMode =
+          _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
+    });
+    _cameraController?.setFlashMode(_flashMode);
+  }
+
+  void _changeResolution(ResolutionPreset newResolution) {
+    setState(() {
+      selectedResolution = newResolution;
+    });
+    _setUpCamera();
+  }
+
+  void _takePicture() async {
+    final XFile file = await _cameraController!.takePicture();
+    setState(() {
+      galleryImage = File(file.path);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Photo saved: ${file.path}")),
+    );
+  }
+
+  void _startVideoRecording() async {
+    if (_cameraController == null || isRecording) return;
+
+    await _cameraController!.startVideoRecording();
+    setState(() {
+      isRecording = true;
+    });
+  }
+
+  void _stopVideoRecording() async {
+    if (!isRecording) return;
+
+    final XFile file = await _cameraController!.stopVideoRecording();
+    setState(() {
+      galleryImage = File(file.path);
+      isRecording = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Video saved: ${file.path}")),
+    );
+  }
+
+  Future<void> _openGallery() async {
+    final XFile? file =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (file != null) {
+      setState(() {
+        galleryImage = File(file.path);
+      });
     }
   }
 
@@ -89,6 +168,20 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  void onCameraTap(TapUpDetails details) async {
+    final position = details.localPosition;
+    final size = MediaQuery.of(context).size;
+    final x = position.dx / size.width;
+    final y = position.dy / size.height;
+
+    try {
+      await _cameraController!.setFocusPoint(Offset(x, y));
+      await _cameraController!.setExposurePoint(Offset(x, y));
+    } catch (e) {
+      print("Error focusing camera: $e");
+    }
+  }
+
   void startArMode() {
     if (selectedGif == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +189,6 @@ class _CameraScreenState extends State<CameraScreen>
       );
       return;
     }
-
     setState(() {
       isArMode = true;
     });
@@ -162,54 +254,184 @@ class _CameraScreenState extends State<CameraScreen>
                       // Camera Preview
                       CameraPreview(_cameraController!),
 
-                      // Controls for camera functionalities (zoom and flash)
+                      // // Controls for camera functionalities (zoom and flash)
+                      // Positioned(
+                      //   top: 20,
+                      //   right: 20,
+                      //   child: Column(
+                      //     children: [
+                      //       // Zoom In Button
+                      //       IconButton(
+                      //         icon: const Icon(Icons.zoom_in,
+                      //             color: Colors.white, size: 28),
+                      //         onPressed: () {
+                      //           setState(() {
+                      //             zoomLevel = (zoomLevel + 0.5).clamp(1.0, maxZoomLevel);
+                      //             _cameraController!.setZoomLevel(zoomLevel);
+                      //           });
+                      //         },
+                      //       ),
+                      //       // Zoom Out Button
+                      //       IconButton(
+                      //         icon: const Icon(Icons.zoom_out,
+                      //             color: Colors.white, size: 28),
+                      //         onPressed: () {
+                      //           setState(() {
+                      //             zoomLevel = (zoomLevel - 0.5).clamp(1.0, 8.0);
+                      //             _cameraController!.setZoomLevel(zoomLevel);
+                      //           });
+                      //         },
+                      //       ),
+                      //       // // Flash Toggle
+                      //       // IconButton(
+                      //       //   icon: Icon(
+                      //       //     _cameraController!.value.flashMode ==
+                      //       //             FlashMode.torch
+                      //       //         ? Icons.flash_on
+                      //       //         : Icons.flash_off,
+                      //       //     color: Colors.white,
+                      //       //     size: 28,
+                      //       //   ),
+                      //       //   onPressed: () {
+                      //       //     setState(() {
+                      //       //       _cameraController!.setFlashMode(
+                      //       //         _cameraController!.value.flashMode ==
+                      //       //                 FlashMode.torch
+                      //       //             ? FlashMode.off
+                      //       //             : FlashMode.torch,
+                      //       //       );
+                      //       //     });
+                      //       //   },
+                      //       // ),
+                      //     ],
+                      //   ),
+                      // ),
+
+                      // Zoom Slider
                       Positioned(
-                        top: 20,
+                        right: 20,
+                        top: MediaQuery.of(context).size.height * 0.2,
+                        bottom: MediaQuery.of(context).size.height * 0.2,
+                        child: RotatedBox(
+                          quarterTurns: -1,
+                          child: Slider(
+                            value: zoomLevel,
+                            min: 1.0,
+                            max: maxZoomLevel,
+                            onChanged: (value) {
+                              setState(() {
+                                zoomLevel = value;
+                                _cameraController!.setZoomLevel(value);
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+
+                      // Camera Controls
+                      Positioned(
+                        top: 40,
                         right: 20,
                         child: Column(
                           children: [
-                            // Zoom In Button
-                            IconButton(
-                              icon: const Icon(Icons.zoom_in,
-                                  color: Colors.white, size: 28),
-                              onPressed: () {
-                                setState(() {
-                                  zoomLevel = (zoomLevel + 0.5).clamp(1.0, 8.0);
-                                  _cameraController!.setZoomLevel(zoomLevel);
-                                });
+                            // // Flash Control
+                            // IconButton(
+                            //   icon: Icon(
+                            //     _flashMode == FlashMode.torch
+                            //         ? Icons.flash_on
+                            //         : Icons.flash_off,
+                            //     color: Colors.white,
+                            //   ),
+                            //   onPressed: _toggleFlash,
+                            // ),
+                            // // Camera Switch
+                            // IconButton(
+                            //   icon: const Icon(Icons.cameraswitch,
+                            //       color: Colors.white),
+                            //   onPressed: _switchCamera,
+                            // ),
+                            // Resolution Selector
+                            DropdownButton<ResolutionPreset>(
+                              dropdownColor: Colors.black,
+                              value: selectedResolution,
+                              items: resolutions
+                                  .map((res) => DropdownMenuItem(
+                                        value: res,
+                                        child: Text(
+                                          res
+                                              .toString()
+                                              .split('.')
+                                              .last
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                              color: Colors.white),
+                                        ),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  _changeResolution(value);
+                                }
                               },
                             ),
-                            // Zoom Out Button
-                            IconButton(
-                              icon: const Icon(Icons.zoom_out,
-                                  color: Colors.white, size: 28),
-                              onPressed: () {
-                                setState(() {
-                                  zoomLevel = (zoomLevel - 0.5).clamp(1.0, 8.0);
-                                  _cameraController!.setZoomLevel(zoomLevel);
-                                });
-                              },
-                            ),
-                            // Flash Toggle
-                            IconButton(
-                              icon: Icon(
-                                _cameraController!.value.flashMode ==
-                                        FlashMode.torch
-                                    ? Icons.flash_on
-                                    : Icons.flash_off,
-                                color: Colors.white,
-                                size: 28,
+                          ],
+                        ),
+                      ),
+
+                      // Bottom Controls
+                      Positioned(
+                        bottom: 30,
+                        left: 20,
+                        right: 20,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Gallery Button
+                            GestureDetector(
+                              onTap: _openGallery,
+                              child: CircleAvatar(
+                                backgroundImage: galleryImage != null
+                                    ? FileImage(galleryImage!)
+                                    : null,
+                                backgroundColor: Colors.grey,
+                                radius: 30,
+                                child: galleryImage == null
+                                    ? const Icon(Icons.image,
+                                        color: Colors.white)
+                                    : null,
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _cameraController!.setFlashMode(
-                                    _cameraController!.value.flashMode ==
-                                            FlashMode.torch
-                                        ? FlashMode.off
-                                        : FlashMode.torch,
-                                  );
-                                });
-                              },
+                            ),
+                            // Capture Button
+                            GestureDetector(
+                              onTap: isImageMode
+                                  ? _takePicture
+                                  : (isRecording
+                                      ? _stopVideoRecording
+                                      : _startVideoRecording),
+                              child: CircleAvatar(
+                                radius: 35,
+                                backgroundColor:
+                                    isRecording ? Colors.red : Colors.white,
+                                child: Icon(
+                                  isImageMode
+                                      ? Icons.camera_alt
+                                      : (isRecording
+                                          ? Icons.stop
+                                          : Icons.videocam),
+                                  color: Colors.black,
+                                  size: 30,
+                                ),
+                              ),
+                            ),
+                            // Camera Switch
+                            GestureDetector(
+                              onTap: _switchCamera,
+                              child: const CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.grey,
+                                child: Icon(Icons.cameraswitch,
+                                    color: Colors.white),
+                              ),
                             ),
                           ],
                         ),
