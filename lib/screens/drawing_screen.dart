@@ -6,6 +6,8 @@ import 'package:yusha_test/widgets/block_picker.dart';
 import 'dart:ui' as ui;
 import 'dart:collection';
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class DrawingScreen extends StatefulWidget {
@@ -35,15 +37,15 @@ class _DrawingScreenState extends State<DrawingScreen> {
   void initState() {
     super.initState();
 
-    // Add a white background to the canvas
-    _paths.add(DrawnPath(
-      path: Path()
-        ..addRect(
-            Rect.fromLTWH(0, 0, 2000, 1000)), // Adjust dimensions as needed
-      type: DrawnPathType.Fill,
-      color: Colors.white,
-      strokeWidth: 0,
-    ));
+    // // Add a white background to the canvas
+    // _paths.add(DrawnPath(
+    //   path: Path()
+    //     ..addRect(
+    //         Rect.fromLTWH(0, 0, 2000, 1000)), // Adjust dimensions as needed
+    //   type: DrawnPathType.Fill,
+    //   color: Colors.white,
+    //   strokeWidth: 0,
+    // ));
   }
 
   @override
@@ -54,20 +56,20 @@ class _DrawingScreenState extends State<DrawingScreen> {
         elevation: 0,
         toolbarHeight: 80,
         actions: [
-          // Padding(
-          //   padding: const EdgeInsets.only(top: 20.0, right: 10),
-          //   child: HoverButton(
-          //     icon: Icons.undo,
-          //     onPressed: _undo,
-          //   ),
-          // ),
-          // Padding(
-          //   padding: const EdgeInsets.only(top: 20.0, right: 10),
-          //   child: HoverButton(
-          //     icon: Icons.redo,
-          //     onPressed: _redo,
-          //   ),
-          // ),
+          Padding(
+            padding: const EdgeInsets.only(top: 20.0, right: 10),
+            child: HoverButton(
+              icon: Icons.undo,
+              onPressed: _undo,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 20.0, right: 10),
+            child: HoverButton(
+              icon: Icons.redo,
+              onPressed: _redo,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 20.0, right: 10),
             child: HoverButton(
@@ -78,7 +80,10 @@ class _DrawingScreenState extends State<DrawingScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 20.0, right: 10),
             child: TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                if (_paths.isNotEmpty) await _saveCanvasImage();
+                Navigator.pop(context);
+              },
               child: Text(
                 "Exit",
                 style: TextStyle(
@@ -456,6 +461,51 @@ class _DrawingScreenState extends State<DrawingScreen> {
     });
   }
 
+  Future<void> _saveCanvasImage() async {
+    try {
+      // Find the render object for the canvas
+      RenderRepaintBoundary boundary = _canvasKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
+
+      // Capture the image from the canvas
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+
+      // Convert the image to bytes
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        throw Exception("Failed to capture canvas image.");
+      }
+
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+
+      // Get the external storage directory
+      final Directory? directory = await getExternalStorageDirectory();
+
+      if (directory == null) {
+        throw Exception("Unable to access external storage.");
+      }
+
+      // Create a unique file name
+      String filePath =
+          "${directory.path}/canvas_image_${DateTime.now().millisecondsSinceEpoch}.png";
+
+      // Write the image to a file
+      final File imageFile = File(filePath);
+      await imageFile.writeAsBytes(pngBytes);
+
+      // Notify the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Canvas saved to: $filePath")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving canvas image: $e")),
+      );
+    }
+  }
+
   void _startDrawing(DragStartDetails details) {
     setState(() {
       _currentPath = DrawnPath(
@@ -540,14 +590,14 @@ class _DrawingScreenState extends State<DrawingScreen> {
     setState(() {
       _paths.clear();
       _redoPaths.clear();
-      _paths.add(DrawnPath(
-        path: Path()
-          ..addRect(
-              Rect.fromLTWH(0, 0, 2000, 1000)), // Adjust dimensions as needed
-        type: DrawnPathType.Fill,
-        color: Colors.white,
-        strokeWidth: 0,
-      ));
+      // _paths.add(DrawnPath(
+      //   path: Path()
+      //     ..addRect(
+      //         Rect.fromLTWH(0, 0, 2000, 1000)), // Adjust dimensions as needed
+      //   type: DrawnPathType.Fill,
+      //   color: Colors.white,
+      //   strokeWidth: 0,
+      // ));
     });
   }
 }
@@ -563,6 +613,14 @@ class DrawingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Draw background rectangle
+    final backgroundPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height), backgroundPaint);
+
+    // Draw all paths
     for (var path in paths) {
       if (path.image != null) {
         // Draw the updated image if it exists

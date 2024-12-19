@@ -1,15 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:yusha_test/widgets/hover_button.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-
-final List<String> initImgList = [
-  'https://images.unsplash.com/photo-1520342868574-5fa3804e551c?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=6ff92caffcdd63681a35134a6770ed3b&auto=format&fit=crop&w=1951&q=80',
-  'https://images.unsplash.com/photo-1522205408450-add114ad53fe?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=368f45b0888aeb0b7b08e3a1084d3ede&auto=format&fit=crop&w=1950&q=80',
-  'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=94a1e718d89ca60a6337a6008341ca50&auto=format&fit=crop&w=1950&q=80',
-  'https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=89719a0d55dd05e2deae4120227e6efc&auto=format&fit=crop&w=1953&q=80',
-  'https://images.unsplash.com/photo-1508704019882-f9cf40e475b4?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=8c6e5e3aba713b17aa1fe71ab4f0ae5b&auto=format&fit=crop&w=1352&q=80',
-  'https://images.unsplash.com/photo-1519985176271-adb1088fa94c?ixlib=rb-0.3.5&ixid=eyJhcHBfaWQiOjEyMDd9&s=a0c8d632e977f94e5d312d9893258f59&auto=format&fit=crop&w=1355&q=80',
-];
+import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({Key? key}) : super(key: key);
@@ -22,8 +16,43 @@ class _GalleryScreenState extends State<GalleryScreen> {
   int currentStep = 0; // Current page index
   int imagesPerStep = 5;
   String? selectedImage; // Image selected from carousel
-  List<String> imgList = List.from(initImgList)
-    ..addAll(List.filled((5 - initImgList.length % 5) % 5, ''));
+  List<String> imgList = []; // Dynamically populated image list
+
+  @override
+  void initState() {
+    super.initState();
+    _loadImagesFromStorage();
+  }
+
+  Future<void> _loadImagesFromStorage() async {
+    try {
+      // Get the external storage directory
+      final Directory? directory = await getExternalStorageDirectory();
+
+      if (directory != null) {
+        // List all files in the directory
+        List<FileSystemEntity> files = directory.listSync();
+
+        // Filter for files starting with "canvas_image_"
+        List<String> images = files
+            .where((file) =>
+                file is File &&
+                file.path.endsWith('.png') &&
+                file.path.contains('canvas_image_'))
+            .map((file) => file.path)
+            .toList();
+
+        setState(() {
+          imgList = images;
+            // ..addAll(List.filled((5 - images.length % 5) % 5, ''));
+          print("Length of images");
+          print(images.length);
+        });
+      }
+    } catch (e) {
+      print("Error loading images: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,8 +134,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
                         child: Container(
-                          height: MediaQuery.of(context).size.height / 4, // Adjusted height for better proportions
-                          width: MediaQuery.of(context).size.width * 0.9, // Fit most of the screen width
+                          height: MediaQuery.of(context).size.height /
+                              4, // Adjusted height for better proportions
+                          width: MediaQuery.of(context).size.width *
+                              0.9, // Fit most of the screen width
                           decoration: BoxDecoration(
                             color: Colors.grey[300],
                             borderRadius: BorderRadius.circular(16),
@@ -114,9 +145,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           child: selectedImage != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  child: Image.network(
-                                    selectedImage!,
-                                    fit: BoxFit.cover, // Ensure the image covers the entire area
+                                  child: Image.file(
+                                    File(selectedImage!),
+                                    fit: BoxFit
+                                        .contain, // Ensure the image covers the entire area
                                   ),
                                 )
                               : Center(
@@ -133,57 +165,78 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       ),
                       const Spacer(),
                       // Carousel with tappable images
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight:
-                              150, // Set a maximum height to avoid overflow
-                        ),
-                        child: CarouselSlider.builder(
-                          options: CarouselOptions(
-                            aspectRatio: 3.0,
-                            enableInfiniteScroll: false,
-                            enlargeCenterPage: false,
-                            viewportFraction: 1,
-                            onPageChanged: (index, reason) {
-                              setState(() {
-                                currentStep = index;
-                              });
-                            },
-                            padEnds: false,
+                      if (imgList.length > 0)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight:
+                                150, // Set a maximum height to avoid overflow
                           ),
-                          itemCount: (imgList.length / imagesPerStep).ceil(),
-                          itemBuilder: (context, index, realIdx) {
-                            List<int> indexes = [];
-                            for (int i = 0; i < imagesPerStep; i++)
-                              indexes.add(currentStep * imagesPerStep + i);
-                            return Row(
-                              children: indexes.map((idx) {
-                                if (idx >= imgList.length) return SizedBox();
-                                return Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        if (imgList[idx] != '')
-                                          selectedImage = imgList[idx];
-                                      });
-                                    },
-                                    child: (imgList[idx] != '')
-                                        ? Container(
-                                            margin: EdgeInsets.symmetric(
-                                                horizontal: 10),
-                                            child: Image.network(
-                                              imgList[idx],
-                                              fit: BoxFit.cover,
-                                            ),
-                                          )
-                                        : SizedBox(width: 16, height: 16),
-                                  ),
-                                );
-                              }).toList(),
-                            );
-                          },
+                          child: CarouselSlider.builder(
+                            options: CarouselOptions(
+                              aspectRatio: 3.0,
+                              enableInfiniteScroll: false,
+                              enlargeCenterPage: false,
+                              viewportFraction: 1,
+                              onPageChanged: (index, reason) {
+                                setState(() {
+                                  currentStep = index;
+                                });
+                              },
+                              padEnds: false,
+                            ),
+                            itemCount: (imgList.length / imagesPerStep).ceil(),
+                            itemBuilder: (context, index, realIdx) {
+                              List<int> indexes = [];
+                              for (int i = 0; i < imagesPerStep; i++)
+                                indexes.add(currentStep * imagesPerStep + i);
+                              return Row(
+                                children: indexes.map((idx) {
+                                  if (idx >= imgList.length)
+                                    return Expanded(
+                                      child: Container(
+                                        margin: EdgeInsets.symmetric(
+                                            horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: Colors
+                                              .grey, // Set the background color
+                                          borderRadius: BorderRadius.circular(
+                                              16), // Rounded corners
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            Icons
+                                                .image_not_supported, // Optional: Add an icon or text
+                                            color: Colors.white70, // Icon color
+                                            size: 40, // Icon size
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  return Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          if (imgList[idx] != '')
+                                            selectedImage = imgList[idx];
+                                        });
+                                      },
+                                      child: (imgList[idx] != '')
+                                          ? Container(
+                                              margin: EdgeInsets.symmetric(
+                                                  horizontal: 10),
+                                              child: Image.file(
+                                                File(imgList[idx]),
+                                                fit: BoxFit.cover,
+                                              ),
+                                            )
+                                          : SizedBox(width: 16, height: 16),
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
                         ),
-                      ),
 
                       // Dots indicator (pagination)
                       Row(
@@ -208,23 +261,62 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       const Spacer(),
                       // Button row
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16.0, horizontal: 20.0),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             // Left button
+                            // SizedBox(
+                            //   width: MediaQuery.of(context).size.width /
+                            //       2.5, // Half width for the button
+                            //   child: ElevatedButton(
+                            //     onPressed: () {
+                            //       // Add functionality
+                            //     },
+                            //     style: ElevatedButton.styleFrom(
+                            //       backgroundColor: Colors.pink[100],
+                            //       shape: RoundedRectangleBorder(
+                            //         borderRadius: BorderRadius.circular(8),
+                            //       ),
+                            //       padding: const EdgeInsets.symmetric(
+                            //           vertical: 16), // Adjust padding
+                            //     ),
+                            //     child: Text(
+                            //       "Load",
+                            //       style: TextStyle(
+                            //         color: Colors.black,
+                            //         fontWeight: FontWeight.bold,
+                            //         fontSize: 16,
+                            //       ),
+                            //     ),
+                            //   ),
+                            // ),
                             SizedBox(
-                              width: MediaQuery.of(context).size.width / 2.5, // Half width for the button
+                              width: MediaQuery.of(context).size.width /
+                                  2.5, // Half width for the button
                               child: ElevatedButton(
-                                onPressed: () {
-                                  // Add functionality
+                                onPressed: () async {
+                                  // Open the image gallery and allow multiple selection
+                                  final List<XFile>? pickedFiles =
+                                      await ImagePicker().pickMultiImage();
+
+                                  if (pickedFiles != null) {
+                                    setState(() {
+                                      // Add selected images to the imgList
+                                      imgList.addAll(pickedFiles
+                                          .map((file) => file.path)
+                                          .toList());
+                                    });
+                                  }
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.pink[100],
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 16), // Adjust padding
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 16), // Adjust padding
                                 ),
                                 child: Text(
                                   "Load",
@@ -236,21 +328,24 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                 ),
                               ),
                             ),
+
                             // Spacing between buttons
                             const SizedBox(width: 16),
                             // Right button
                             SizedBox(
-                              width: MediaQuery.of(context).size.width / 2.5, // Half width for the button
+                              width: MediaQuery.of(context).size.width /
+                                  2.5, // Half width for the button
                               child: ElevatedButton(
                                 onPressed: () {
-                                  // Add functionality
+                                  Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 16), // Adjust padding
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 16), // Adjust padding
                                 ),
                                 child: Text(
                                   "Complete",
